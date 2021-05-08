@@ -17,6 +17,13 @@ import json
 import pickle
 # Create your views here.
 
+
+# http://127.0.0.1:8000/core
+class TestView(APIView):
+    def get(self, request):
+        return Response({"success": True})
+
+
 # http://127.0.0.1:8000/core/scrape
 class ScrapeView(APIView):
     def get(self, request):
