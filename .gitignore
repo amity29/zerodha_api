@@ -127,3 +127,10 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+/scraper.py
+/test.py
+/chromedriver
+/_media/bse_extract/
+/_media/bse_zip/
+.idea
+.DS_Store
