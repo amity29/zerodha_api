@@ -132,3 +132,5 @@ dmypy.json
 /chromedriver
 /_media/bse_extract/
 /_media/bse_zip/
+.idea
+.DS_Store
