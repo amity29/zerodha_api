@@ -33,15 +33,24 @@ class ScrapeView(APIView):
         # return Response({1:2})
 
     def scrape(self):
-        chromeOptions = webdriver.ChromeOptions()
-
         download_dir = os.path.join(settings.MEDIA_ROOT, "bse_zip")
         if not os.path.exists(download_dir):
             os.makedirs(download_dir)
 
+        chrome_options = webdriver.ChromeOptions()
+        if settings.DEBUG is False:
+            chrome_options.add_argument("--headless")
+            chrome_options.add_argument("--disable-dev-shm-usage")
+            chrome_options.add_argument("--no-sandbox")
+            chrome_options.binary_location = os.environ.get("GOOGLE_CHROME_BIN")
+
         prefs = {"download.default_directory": download_dir}
-        chromeOptions.add_experimental_option("prefs", prefs)
-        driver = webdriver.Chrome(executable_path=f"{settings.BASE_DIR}/chromedriver", options=chromeOptions)
+        chrome_options.add_experimental_option("prefs", prefs)
+
+        print("CHROMEDRIVER_PATH ", os.environ.get("CHROMEDRIVER_PATH"))
+
+        # driver = webdriver.Chrome(executable_path=f"{settings.BASE_DIR}/chromedriver", options=chrome_options)
+        driver = webdriver.Chrome(executable_path=os.environ.get("CHROMEDRIVER_PATH"), options=chrome_options)
 
         url = os.getenv('URL')
         driver.get(url)
