@@ -1,4 +1,3 @@
-from django.shortcuts import render
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from selenium import webdriver
@@ -15,29 +14,38 @@ from zerodha_api.settings import redis_db
 import pandas as pd
 import json
 import threading
+from .serializers import DateSerializer
 # Create your views here.
 
 
-# http://127.0.0.1:8000/core
+# http://127.0.0.1:8000
 class TestView(APIView):
     def get(self, request):
-        print("redis keys ",redis_db.keys())
         return Response({"success": True,
-                         "path": os.environ.get("CHROMEDRIVER_PATH"),
-                         "redis_keys": str(redis_db.keys())})
+                         "redis_keys": redis_db.keys()})
 
 
-# http://127.0.0.1:8000/core/scrape
+# http://127.0.0.1:8000/scrape
+# http://127.0.0.1:8000/scrape?date=1-2-2021
 class ScrapeView(APIView):
     def get(self, request):
-        # res, status = self.scrape()
-        x = threading.Thread(target=self.scrape)
+        s = DateSerializer(data=request.query_params)
+        s.is_valid(raise_exception=True)
+
+        date = s.validated_data.get('date', (timezone.now() - timezone.timedelta(1)).date())
+
+        x = threading.Thread(target=self.scrape, args=(date,))
         x.start()
-        return Response({"message": "Scrape start"}, status=200)
 
-        # return Response({1:2})
+        return Response({
+            "message": "Scrape start",
+            "scrape_date": str(date),
+            "success": True
+        }, status=200)
 
-    def scrape(self):
+    def scrape(self, date):
+        day, month, year = map(str, (date.day, date.month, date.year))
+
         download_dir = os.path.join(settings.MEDIA_ROOT, "bse_zip")
         if not os.path.exists(download_dir):
             os.makedirs(download_dir)
@@ -61,12 +69,6 @@ class ScrapeView(APIView):
         driver.get(url)
         driver.implicitly_wait(30)
 
-        today = timezone.now() - timezone.timedelta(1)
-
-        # day, month, year = map(str, (today.day, today.month, today.year))
-
-        day, month, year = "23", "3", "2021"
-
         date_selector = Select(driver.find_element_by_id("ContentPlaceHolder1_fdate1"))
         date_selector.select_by_value(day)
         month_selector = Select(driver.find_element_by_id("ContentPlaceHolder1_fmonth1"))
@@ -78,9 +80,7 @@ class ScrapeView(APIView):
 
         is_file_present = not self.is_element_present(By.ID, "ContentPlaceHolder1_lblCurZip", driver)
 
-        print("is_file_present", is_file_present)
-
-        is_file_present = True
+        print("is_file_present ",is_file_present)
 
         if is_file_present:
             driver.find_element_by_id("ContentPlaceHolder1_btnHylSearBhav").click()
@@ -88,12 +88,12 @@ class ScrapeView(APIView):
             driver.quit()
             file_name = self.unzip_file(download_dir)
             self.read_csv(file_name)
-            return {"success": True}, 200
+            return True
 
         else:
             msg = driver.find_element_by_id("ContentPlaceHolder1_lblCurZip").get_attribute("innerHTML")
             driver.quit()
-            return {"success": False, "message": msg}, 404
+            return False
 
     def is_element_present(self, how, what, driver):
         try:
@@ -126,14 +126,9 @@ class ScrapeView(APIView):
         return True
 
 
-# http://127.0.0.1:8000/core/list
+# http://127.0.0.1:8000/list
 class ListView(APIView):
     def get(self, request):
-
-        # # a = redis_db.hget('Bhavcopy', '*10MFL*')
-        # a = redis_db.hscan(name='Bhavcopy', cursor=0, match='10M*', count=1000)
-        # print("a",a)
-        # return Response({1:2})
         search_key = request.query_params.get('key')
         print("ss", search_key)
         if not search_key:
@@ -142,11 +137,17 @@ class ListView(APIView):
             search_key = search_key.lower()
             data = redis_db.hscan(name='Bhavcopy', cursor=0, match=f'*{search_key}*', count=1000000)[1]
 
-        print(search_key, data)
-
         new_data = []
         if data:
-            # new_data = [{k: json.loads(v)} for k, v in data.items()]
             new_data = [json.loads(v) for k, v in data.items()]
 
-        return Response(new_data)
+        return Response(new_data, status=200)
+
+
+# http://127.0.0.1:8000/delete
+class DeleteView(APIView):
+    def get(self, request):
+        redis_db.delete('Bhavcopy')
+        return Response({
+            "success": True
+        }, status=200)
