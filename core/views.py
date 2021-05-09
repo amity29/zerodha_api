@@ -21,7 +21,7 @@ import pickle
 # http://127.0.0.1:8000/core
 class TestView(APIView):
     def get(self, request):
-        return Response({"success": True})
+        return Response({"success": True, "path": os.environ.get("CHROMEDRIVER_PATH")})
 
 
 # http://127.0.0.1:8000/core/scrape
