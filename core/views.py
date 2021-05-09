@@ -14,7 +14,7 @@ import zipfile
 from zerodha_api.settings import redis_db
 import pandas as pd
 import json
-import pickle
+import threading
 # Create your views here.
 
 
@@ -30,8 +30,10 @@ class TestView(APIView):
 # http://127.0.0.1:8000/core/scrape
 class ScrapeView(APIView):
     def get(self, request):
-        res, status = self.scrape()
-        return Response(res, status=status)
+        # res, status = self.scrape()
+        x = threading.Thread(target=self.scrape)
+        x.start()
+        return Response({"message": "Scrape start"}, status=200)
 
         # return Response({1:2})
 
