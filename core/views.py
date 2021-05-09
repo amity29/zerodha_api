@@ -21,7 +21,10 @@ import pickle
 # http://127.0.0.1:8000/core
 class TestView(APIView):
     def get(self, request):
-        return Response({"success": True, "path": os.environ.get("CHROMEDRIVER_PATH")})
+        print("redis keys ",redis_db.keys())
+        return Response({"success": True,
+                         "path": os.environ.get("CHROMEDRIVER_PATH"),
+                         "redis_keys": str(redis_db.keys())})
 
 
 # http://127.0.0.1:8000/core/scrape
@@ -38,7 +41,7 @@ class ScrapeView(APIView):
             os.makedirs(download_dir)
 
         chrome_options = webdriver.ChromeOptions()
-        if settings.DEBUG is False:
+        if not settings.DEBUG:
             chrome_options.add_argument("--headless")
             chrome_options.add_argument("--disable-dev-shm-usage")
             chrome_options.add_argument("--no-sandbox")
