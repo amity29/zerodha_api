@@ -21,18 +21,26 @@ from .serializers import DateSerializer
 # http://127.0.0.1:8000
 class TestView(APIView):
     def get(self, request):
+        """
+        To test the server status
+        """
         return Response({"success": True,
                          "redis_keys": redis_db.keys()})
 
 
 # http://127.0.0.1:8000/scrape
-# http://127.0.0.1:8000/scrape?date=1-2-2021
+# http://127.0.0.1:8000/scrape?date=2021-02-04
 class ScrapeView(APIView):
     def get(self, request):
+        """
+        This will trigger the scrapping function in background and
+        return response without waiting for the func to be complete.
+        """
         s = DateSerializer(data=request.query_params)
         s.is_valid(raise_exception=True)
 
         date = s.validated_data.get('date', (timezone.now() - timezone.timedelta(1)).date())
+        redis_db.delete('Bhavcopy')
 
         x = threading.Thread(target=self.scrape, args=(date,))
         x.start()
@@ -44,6 +52,13 @@ class ScrapeView(APIView):
         }, status=200)
 
     def scrape(self, date):
+        """
+        This function will start the scrapping process
+
+        :param date:
+        :return: True/False
+
+        """
         day, month, year = map(str, (date.day, date.month, date.year))
 
         download_dir = os.path.join(settings.MEDIA_ROOT, "bse_zip")
@@ -62,7 +77,6 @@ class ScrapeView(APIView):
 
         print("CHROMEDRIVER_PATH ", os.environ.get("CHROMEDRIVER_PATH"))
 
-        # driver = webdriver.Chrome(executable_path=f"{settings.BASE_DIR}/chromedriver", options=chrome_options)
         driver = webdriver.Chrome(executable_path=os.environ.get("CHROMEDRIVER_PATH"), options=chrome_options)
 
         url = os.getenv('URL')
@@ -96,6 +110,13 @@ class ScrapeView(APIView):
             return False
 
     def is_element_present(self, how, what, driver):
+        """
+        Helper function to check if element is present in HTML page
+        :param how:
+        :param what:
+        :param driver:
+        :return: True/False
+        """
         try:
             driver.find_element(by=how, value=what)
         except NoSuchElementException:
@@ -103,6 +124,11 @@ class ScrapeView(APIView):
         return True
 
     def unzip_file(self, download_dir):
+        """
+        Extract the downloaded zip file
+        :param download_dir:
+        :return: latest file path
+        """
         list_of_files = glob.glob(download_dir + '/*')
         latest_file = max(list_of_files, key=os.path.getctime)
         zip_ref = zipfile.ZipFile(latest_file)
@@ -112,9 +138,15 @@ class ScrapeView(APIView):
             os.makedirs(download_dir)
         zip_ref.extractall(unzip_dir)
         zip_ref.close()
+        print("File extraction complete")
         return latest_file
 
     def read_csv(self, file_name):
+        """
+        Read the extracted CSV file and load data in redis hash.
+        :param file_name:
+        :return: True
+        """
         df = pd.read_csv(file_name, usecols=['SC_CODE', 'SC_NAME', 'OPEN', 'HIGH', 'LOW', 'CLOSE'])
         df['SC_NAME'] = df['SC_NAME'].str.strip()
         df['SC_NAME'] = df['SC_NAME'].str.lower()
@@ -123,14 +155,18 @@ class ScrapeView(APIView):
         for data in dict:
             redis_db.hset("Bhavcopy", data['SC_NAME'].strip(), json.dumps(data))
 
+        print("Read csv complete")
         return True
 
 
 # http://127.0.0.1:8000/list
+# http://127.0.0.1:8000/list?search=0mmf
 class ListView(APIView):
     def get(self, request):
-        search_key = request.query_params.get('key')
-        print("ss", search_key)
+        """
+        Return all the Scraped data stored in redis hash in JSON format
+        """
+        search_key = request.query_params.get('search')
         if not search_key:
             data = redis_db.hgetall('Bhavcopy')
         else:
@@ -147,6 +183,9 @@ class ListView(APIView):
 # http://127.0.0.1:8000/delete
 class DeleteView(APIView):
     def get(self, request):
+        """
+        Delete all the store data in redis hash.
+        """
         redis_db.delete('Bhavcopy')
         return Response({
             "success": True
