@@ -24,8 +24,18 @@ class TestView(APIView):
         """
         To test the server status
         """
-        return Response({"success": True,
-                         "redis_keys": redis_db.keys()})
+        redis_status = True
+        keys = None
+        try:
+            keys = redis_db.keys()
+        except Exception as e:
+            redis_status = False
+
+        return Response({
+                         "redis_keys": keys,
+                         "redis_status": redis_status,
+                         "django_server": "Running"
+                         })
 
 
 # http://127.0.0.1:8000/scrape
